@@ -63,6 +63,38 @@ func IsRuleFile(name string) bool {
 		strings.HasSuffix(name, ".otelc.yaml")
 }
 
+// LinknameSymbolPrefix converts an import path to the symbol prefix the Go
+// toolchain uses for object symbols, i.e. the part before the final "." in a
+// //go:linkname target. It mirrors cmd/internal/objabi.PathToPrefix: control
+// characters, space, '%', '"' and non-7-bit bytes are escaped as %xx, and '.'
+// is escaped only inside the last path element (after the last '/'). A linkname
+// built from the raw import path silently fails to link when the last path
+// element contains a dot, because the compiler emits symbols under the escaped
+// prefix — e.g. an instrumentation module whose path ends in "nats.go" is
+// emitted as ".../nats%2ego.BeforePublish", not ".../nats.go.BeforePublish".
+func LinknameSymbolPrefix(importPath string) string {
+	slash := strings.LastIndex(importPath, "/")
+	n := 0
+	for i := range len(importPath) {
+		if c := importPath[i]; c <= ' ' || (c == '.' && i > slash) || c == '%' || c == '"' || c >= 0x7F {
+			n++
+		}
+	}
+	if n == 0 {
+		return importPath
+	}
+	const hex = "0123456789abcdef"
+	p := make([]byte, 0, len(importPath)+2*n)
+	for i := range len(importPath) {
+		if c := importPath[i]; c <= ' ' || (c == '.' && i > slash) || c == '%' || c == '"' || c >= 0x7F {
+			p = append(p, '%', hex[c>>4], hex[c&0xF])
+		} else {
+			p = append(p, c)
+		}
+	}
+	return string(p)
+}
+
 func GetMatchedRuleFile() string {
 	const matchedRuleFile = "matched.json"
 	return GetBuildTemp(matchedRuleFile)
