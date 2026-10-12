@@ -286,3 +286,42 @@ func TestDiscoverWorkDir(t *testing.T) {
 		}
 	})
 }
+
+func TestLinknameSymbolPrefix(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected string
+	}{
+		{
+			name:     "plain path unchanged",
+			path:     "go.opentelemetry.io/otelc/instrumentation/github.com/IBM/sarama",
+			expected: "go.opentelemetry.io/otelc/instrumentation/github.com/IBM/sarama",
+		},
+		{
+			name:     "dot in last element is escaped",
+			path:     "go.opentelemetry.io/otelc/instrumentation/github.com/nats-io/nats.go",
+			expected: "go.opentelemetry.io/otelc/instrumentation/github.com/nats-io/nats%2ego",
+		},
+		{
+			name:     "dot in earlier element is kept",
+			path:     "gopkg.in/yaml.v3",
+			expected: "gopkg.in/yaml%2ev3",
+		},
+		{
+			name:     "multiple dots in last element",
+			path:     "example.com/mod/v..1.",
+			expected: "example.com/mod/v%2e%2e1%2e",
+		},
+		{
+			name:     "percent and quote escaped",
+			path:     "example.com/mod/100%25.v1",
+			expected: "example.com/mod/100%2525%2ev1",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, LinknameSymbolPrefix(tt.path))
+		})
+	}
+}
