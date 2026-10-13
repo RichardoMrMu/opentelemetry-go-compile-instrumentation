@@ -1,5 +1,14 @@
 [
   {
+    "module": "github.com/go-resty/resty/v2",
+    "versionRange": "v2.0.0",
+    "name": "resty",
+    "package": "go.opentelemetry.io/otelc/instrumentation/github.com/go-resty/resty/v2",
+    "rules": [
+      "resty_client_execute"
+    ]
+  },
+  {
     "modulePath": "go.opentelemetry.io/otelc/instrumentation/database/sql",
     "target": "database/sql"
   },

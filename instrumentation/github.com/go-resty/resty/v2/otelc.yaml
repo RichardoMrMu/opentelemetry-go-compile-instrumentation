@@ -1,0 +1,15 @@
+version: "v1.0.0"
+
+# (*Client).execute is the internal gateway for all HTTP verbs and request flows in resty/v2.
+# Present and stable from v2.0.0 onward.
+resty_client_execute:
+  target: github.com/go-resty/resty/v2
+  version: v2.0.0
+  where:
+    func: execute
+    recv: "*Client"
+  do:
+    - inject_hooks:
+        before: BeforeExecute
+        after: AfterExecute
+        path: "go.opentelemetry.io/otelc/instrumentation/github.com/go-resty/resty/v2"
