@@ -1,0 +1,71 @@
+groups:
+  # ---------------------------------------------------------------------------
+  # github.com/nats-io/nats.go instrumentation emission contract.
+  #
+  # Source of truth for this file:
+  #   instrumentation/github.com/nats-io/nats.go/hook.go
+  #   instrumentation/github.com/nats-io/nats.go/semconv/client.go
+  #
+  # make lint-schema (Weaver) checks registry shape against upstream semconv.
+  # It does not compare this list to TraceAttrs. Keeping the two in sync is a
+  # review check, same as kafka.yaml and rabbitmq.yaml.
+  #
+  # Trace-only, no metrics. Every publish path funnels through the internal
+  # (*Conn).publish, which emits one producer span; async Subscribe and
+  # QueueSubscribe callbacks emit one process span per delivered message, and
+  # (*Subscription).NextMsg emits one receive span per fetched message. Trace
+  # context is spliced into the encoded NATS header block.
+  #
+  # Control-plane subjects (empty or "$"-prefixed: $SYS.*, $JS.API.*, $KV.*)
+  # produce no spans. JetStream persistence is not separately observed: the
+  # core publish/deliver spans carry the trace. See
+  # https://github.com/open-telemetry/opentelemetry-go-compile-instrumentation/issues/695.
+  #
+  # server.address/server.port are set on publish and on Subscribe callbacks,
+  # which hold the *Conn and its ConnectedAddr. The receive span omits them
+  # because *Subscription does not expose its connection, same limitation as
+  # rabbitmq.yaml's unexported channel connection.
+  # ---------------------------------------------------------------------------
+
+  - id: span.otelc.messaging.nats.producer
+    type: span
+    span_kind: producer
+    stability: development
+    brief: NATS producer span, one per publish through the internal (*Conn).publish (Publish, PublishMsg, PublishRequest,
+      Request and JetStream publishes).
+    attributes:
+      - ref: messaging.system
+      - ref: messaging.operation.name
+      - ref: messaging.operation.type
+      - ref: messaging.destination.name
+      - ref: server.address
+      - ref: server.port
+      - ref: messaging.message.body.size
+
+  - id: span.otelc.messaging.nats.process
+    type: span
+    span_kind: consumer
+    stability: development
+    brief: NATS process span, one per message delivered to a Subscribe/QueueSubscribe callback; it starts when the callback
+      is invoked and ends when it returns.
+    attributes:
+      - ref: messaging.system
+      - ref: messaging.operation.name
+      - ref: messaging.operation.type
+      - ref: messaging.destination.name
+      - ref: server.address
+      - ref: server.port
+      - ref: messaging.message.body.size
+
+  - id: span.otelc.messaging.nats.receive
+    type: span
+    span_kind: consumer
+    stability: development
+    brief: NATS receive span, one per successfully fetched (*Subscription).NextMsg result; it measures the fetch, not caller
+      processing, and ends immediately.
+    attributes:
+      - ref: messaging.system
+      - ref: messaging.operation.name
+      - ref: messaging.operation.type
+      - ref: messaging.destination.name
+      - ref: messaging.message.body.size
