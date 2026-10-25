@@ -13,6 +13,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"go.opentelemetry.io/otelc/tool/util"
 )
 
 func TestNormalizePath(t *testing.T) {
@@ -220,6 +222,34 @@ func TestExtractGZip_Normal(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, content, bs)
+}
+
+func TestExtractOtelcBundle_CleansStaleFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv(util.EnvOtelcWorkDir, tmpDir)
+
+	buildTemp := util.GetBuildTempDir()
+	stalePkgFile := filepath.Join(buildTemp, unzippedPkgDir, "stale_pkg.go")
+	staleInstFile := filepath.Join(buildTemp, unzippedInstDir, "stale_inst.go")
+	preservedStateFile := filepath.Join(buildTemp, "state.json")
+
+	require.NoError(t, os.MkdirAll(filepath.Dir(stalePkgFile), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Dir(staleInstFile), 0o755))
+	require.NoError(t, os.WriteFile(stalePkgFile, []byte("package stale"), 0o644))
+	require.NoError(t, os.WriteFile(staleInstFile, []byte("package stale"), 0o644))
+	require.NoError(t, os.WriteFile(preservedStateFile, []byte("{}"), 0o644))
+
+	require.NoError(t, extractOtelcBundle())
+
+	// Stale files from previous bundle extractions should be cleaned
+	_, err := os.Stat(stalePkgFile)
+	require.True(t, os.IsNotExist(err), "stale pkg file should be removed before extraction")
+	_, err = os.Stat(staleInstFile)
+	require.True(t, os.IsNotExist(err), "stale instrumentation file should be removed before extraction")
+
+	// Other build state files outside pkg/ and instrumentation/ should be preserved
+	_, err = os.Stat(preservedStateFile)
+	require.NoError(t, err, "non-bundle build files should be preserved")
 }
 
 func TestExtractGZip_SkipsZipSlip(t *testing.T) {

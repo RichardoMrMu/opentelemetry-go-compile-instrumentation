@@ -141,6 +141,14 @@ func extractGZip(bundleReader io.Reader, targetDir string) (retErr error) {
 
 func extractOtelcBundle() error {
 	// Extract the instrumentation code to the build temp directory
-	// for future instrumentation phase
-	return extractGZip(data.GetBundleReader(), util.GetBuildTempDir())
+	// for future instrumentation phase.
+	// Clean the target bundle directories first so files removed or renamed in newer
+	// otelc versions do not linger and cause compilation errors (see issue #1512).
+	buildTemp := util.GetBuildTempDir()
+	for _, sub := range []string{unzippedPkgDir, unzippedInstDir} {
+		if err := os.RemoveAll(filepath.Join(buildTemp, sub)); err != nil {
+			return ex.Wrap(err)
+		}
+	}
+	return extractGZip(data.GetBundleReader(), buildTemp)
 }
